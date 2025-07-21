@@ -1,0 +1,6 @@
+streamlit
+aiohttp
+beautifulsoup4
+pandas
+lxml
+requests
