@@ -14,7 +14,22 @@ if "url_list" not in st.session_state:
 if "result_df" not in st.session_state:
     st.session_state["result_df"] = None
 
-tab_sitemap, tab_manual, tab_crawler = st.tabs(["Sitemap laden", "Manuelle Eingabe", "Crawler"])
+tab_crawler, tab_manual, tab_sitemap = st.tabs(["Crawler", "Manuelle Eingabe", "Sitemap laden"])
+
+with tab_crawler:
+    crawl_url = st.text_input("Start-URL zum Crawlen", placeholder="https://example.com")
+    max_pages = st.slider("Max. Anzahl zu crawlender Seiten", 1, 500, 50)
+    if st.button("Domain crawlen"):
+        if crawl_url:
+            with st.spinner("Crawle interne Seiten …"):
+                st.session_state["url_list"] = asyncio.run(crawl_domain(crawl_url, max_pages))
+            st.success(f"{len(st.session_state['url_list'])} interne Seiten gefunden.")
+
+with tab_manual:
+    textarea = st.text_area("Eine URL pro Zeile")
+    if st.button("URLs übernehmen"):
+        st.session_state["url_list"] = [u.strip() for u in textarea.splitlines() if u.strip()]
+        st.success(f"{len(st.session_state['url_list'])} URLs übernommen.")
 
 with tab_sitemap:
     sitemap_url = st.text_input("Sitemap-URL", placeholder="https://example.com/sitemap.xml")
@@ -23,21 +38,6 @@ with tab_sitemap:
             with st.spinner("Sitemap wird geladen …"):
                 st.session_state["url_list"] = load_sitemap(sitemap_url)
             st.success(f"{len(st.session_state['url_list'])} URLs gefunden.")
-
-with tab_manual:
-    textarea = st.text_area("Eine URL pro Zeile")
-    if st.button("URLs übernehmen"):
-        st.session_state["url_list"] = [u.strip() for u in textarea.splitlines() if u.strip()]
-        st.success(f"{len(st.session_state['url_list'])} URLs übernommen.")
-
-with tab_crawler:
-    crawl_url = st.text_input("Start-URL zum Crawlen", placeholder="https://example.com")
-    max_pages = st.slider("Max. Anzahl zu crawlender Seiten", 10, 500, 100)
-    if st.button("Domain crawlen"):
-        if crawl_url:
-            with st.spinner("Crawle interne Seiten …"):
-                st.session_state["url_list"] = asyncio.run(crawl_domain(crawl_url, max_pages))
-            st.success(f"{len(st.session_state['url_list'])} interne Seiten gefunden.")
 
 st.divider()
 
