@@ -6,8 +6,17 @@ from crawler_async import crawl
 from sitemap_loader import load_sitemap
 from crawler_spider import crawl_domain
 
+LOGO_URL_LARGE = "https://www.berendsohn.de/logos/bag-logo.svg"
+LOGO_URL_SMALL = "https://www.berendsohn.de/logos/bag-logo.svg"
+
+st.logo(
+    LOGO_URL_LARGE,
+    icon_image=LOGO_URL_SMALL,
+)
+
 st.set_page_config(page_title="SEO-Checker", layout="wide")
 st.title("SEO-Checker")
+st.text("Prüfe jetzt eine URL, um wertvolle Einblicke in die wichtigsten SEO-Metriken zu erhalten.")
 
 if "url_list" not in st.session_state:
     st.session_state["url_list"] = []
@@ -18,7 +27,7 @@ tab_crawler, tab_manual, tab_sitemap = st.tabs(["Crawler", "Manuelle Eingabe", "
 
 with tab_crawler:
     crawl_url = st.text_input("Start-URL zum Crawlen", placeholder="https://example.com")
-    max_pages = st.slider("Max. Anzahl zu crawlender Seiten", 1, 500, 50)
+    max_pages = st.slider("Max. Anzahl zu crawlender Seiten", 10, 500, 100)
     if st.button("Domain crawlen"):
         if crawl_url:
             with st.spinner("Crawle interne Seiten …"):
@@ -28,8 +37,9 @@ with tab_crawler:
 with tab_manual:
     textarea = st.text_area("Eine URL pro Zeile")
     if st.button("URLs übernehmen"):
-        st.session_state["url_list"] = [u.strip() for u in textarea.splitlines() if u.strip()]
-        st.success(f"{len(st.session_state['url_list'])} URLs übernommen.")
+        urls = [u.strip() for u in textarea.splitlines() if u.strip()]
+        st.session_state["url_list"] = urls
+        st.success(f"{len(urls)} URLs übernommen.")
 
 with tab_sitemap:
     sitemap_url = st.text_input("Sitemap-URL", placeholder="https://example.com/sitemap.xml")
@@ -44,7 +54,6 @@ st.divider()
 if st.session_state["url_list"]:
     if st.button("Analyse starten"):
         progress = st.progress(0, "Starte Analyse …")
-
         async def run_crawl(urls):
             df_all = []
             for idx, url in enumerate(urls, 1):
@@ -66,7 +75,6 @@ if st.session_state["result_df"] is not None:
     df = st.session_state["result_df"].drop(
         columns=[c for c in ("Hinweis",) if c in st.session_state["result_df"].columns]
     )
-
     try:
         styled = df.style.apply(row_style, axis=1)
         st.dataframe(styled, use_container_width=True)

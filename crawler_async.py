@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""
-Asynchroner SEO-Crawler – optimiert für große URL-Mengen
---------------------------------------------------------
-Spalten:
-• URL • HTTP Status • Status (noindex) • Robots Policy • Title • Meta Description
-• H1 • Wörter • CMS • Hinweis
-Concurrency per CLI oder Funktions­parameter einstellbar.
-"""
-
 import asyncio, aiohttp, pandas as pd, ssl, urllib.parse, re, time, argparse
 from bs4 import BeautifulSoup
 from typing import List, Callable, Awaitable
@@ -17,7 +7,6 @@ UNSAFE_SSL = ssl.create_default_context()
 UNSAFE_SSL.check_hostname = False
 UNSAFE_SSL.verify_mode = ssl.CERT_NONE
 
-# ---------- Helpers ---------------------------------------------------------
 def strip_html_for_wc(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     if soup.head:
@@ -50,12 +39,14 @@ def parse_page(html: str):
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
     meta = soup.find("meta", attrs={"name": "description"})
     meta_desc = meta.get("content", "").strip() if meta else ""
+
+    # H1 robust extrahieren inkl. verschachteltem Text
     h1 = soup.find("h1")
-    h1_txt = h1.get_text(strip=True) if h1 else ""
+    h1_txt = h1.get_text(separator=" ", strip=True) if h1 else ""
+
     wc = word_count(html)
     return title, meta_desc, h1_txt, wc
 
-# ---------- Core ------------------------------------------------------------
 async def fetch(session: aiohttp.ClientSession, url: str, retries=3):
     last_exc = None
     for attempt in range(retries):
@@ -109,7 +100,6 @@ def check_noindex(html: str, headers) -> str:
         return "NOINDEX via Meta"
     return "Indexable"
 
-# ---------- Worker ----------------------------------------------------------
 async def worker(url: str, session, sem, progress_cb=None):
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -138,7 +128,6 @@ async def worker(url: str, session, sem, progress_cb=None):
             "CMS": cms,
         }
 
-# ---------- Public crawl() --------------------------------------------------
 async def crawl(
     urls: List[str],
     concurrency: int = 20,
@@ -151,7 +140,6 @@ async def crawl(
         results = await asyncio.gather(*tasks)
     return pd.DataFrame(results)
 
-# ---------- CLI -------------------------------------------------------------
 if __name__ == "__main__":
     ap = argparse.ArgumentParser("Asynchroner SEO-Crawler")
     ap.add_argument("--input", required=True)
