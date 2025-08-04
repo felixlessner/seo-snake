@@ -2,6 +2,9 @@
 import streamlit as st
 import asyncio
 import pandas as pd
+import io
+import datetime
+from pandas import ExcelWriter
 from crawler_async import crawl
 from sitemap_loader import load_sitemap
 from crawler_spider import crawl_domain
@@ -13,6 +16,8 @@ st.logo(
     LOGO_URL_LARGE,
     icon_image=LOGO_URL_SMALL,
 )
+
+today_str = datetime.date.today().strftime("%Y%m%d")
 
 st.set_page_config(page_title="SEO-Checker", layout="wide")
 st.title("SEO-Checker")
@@ -75,14 +80,32 @@ if st.session_state["result_df"] is not None:
     df = st.session_state["result_df"].drop(
         columns=[c for c in ("Hinweis",) if c in st.session_state["result_df"].columns]
     )
+
     try:
         styled = df.style.apply(row_style, axis=1)
         st.dataframe(styled, use_container_width=True)
     except AttributeError:
         st.dataframe(df, use_container_width=True)
 
+    # CSV Export
     csv = df.to_csv(index=False).encode()
-    st.download_button("CSV herunterladen", csv, "seo_checker_results.csv", mime="text/csv")
+    st.download_button(
+        label="CSV herunterladen",
+        data=csv,
+        file_name=f"seo_checker_results_{today_str}.csv",
+        mime="text/csv"
+    )
+
+    # Excel Export
+    excel_buffer = io.BytesIO()
+    with ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="SEO Ergebnisse")
+    st.download_button(
+        label="Excel herunterladen",
+        data=excel_buffer.getvalue(),
+        file_name=f"seo_checker_results_{today_str}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
     st.markdown("---")
     st.subheader("Erklärungen der SEO-Metriken")

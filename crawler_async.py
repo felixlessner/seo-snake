@@ -39,11 +39,8 @@ def parse_page(html: str):
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
     meta = soup.find("meta", attrs={"name": "description"})
     meta_desc = meta.get("content", "").strip() if meta else ""
-
-    # H1 robust extrahieren inkl. verschachteltem Text
     h1 = soup.find("h1")
     h1_txt = h1.get_text(separator=" ", strip=True) if h1 else ""
-
     wc = word_count(html)
     return title, meta_desc, h1_txt, wc
 
@@ -100,6 +97,53 @@ def check_noindex(html: str, headers) -> str:
         return "NOINDEX via Meta"
     return "Indexable"
 
+async def check_link(session, link):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/114.0.0.0 Safari/537.36"
+        )
+    }
+
+    try:
+        async with session.head(link, allow_redirects=True, timeout=10, headers=headers) as resp:
+            if 200 <= resp.status < 400:
+                return None
+            else:
+                return link
+    except Exception:
+        try:
+            async with session.get(link, allow_redirects=True, timeout=10, headers=headers) as resp:
+                if 200 <= resp.status < 400:
+                    return None
+                else:
+                    return link
+        except Exception:
+            return link
+
+async def find_broken_links(html: str, base_url: str, session) -> str:
+    soup = BeautifulSoup(html, "lxml")
+    links_with_text = {}
+    for tag in soup.find_all("a", href=True):
+        href = tag.get("href")
+        if href.startswith("mailto:") or href.startswith("tel:"):
+            continue
+        link = urllib.parse.urljoin(base_url, href)
+        anchor = tag.get_text(strip=True)
+        links_with_text[link] = anchor
+
+    tasks = [(link, check_link(session, link)) for link in links_with_text]
+    results = await asyncio.gather(*(task for _, task in tasks))
+
+    broken = []
+    for (link, anchor), result in zip(tasks, results):
+        if result:
+            anchor_display = f'"{links_with_text[link]}"' if links_with_text[link] else '[kein Text]'
+            broken.append(f"{result} (Text: {anchor_display})")
+
+    return ", ".join(broken)
+
 async def worker(url: str, session, sem, progress_cb=None):
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -109,16 +153,17 @@ async def worker(url: str, session, sem, progress_cb=None):
         try:
             status_code, html, headers = await fetch(session, url)
         except Exception as e:
-            return {"URL": url, "HTTP Status": "-", "Status": f"Error: {e}"}
+            return {"URL": url, "Status": f"Error: {e}"}
 
         seo_status = check_noindex(html, headers)
         title, meta_desc, h1, wc = parse_page(html)
         robots = await check_robots(session, url)
         cms = detect_cms(html, headers, url)
+        broken_links = await find_broken_links(html, url, session)
 
         return {
             "URL": url,
-            "HTTP Status": status_code,
+            # "HTTP Status": status_code,
             "Status": seo_status,
             "Robots Policy": robots,
             "Title": title,
@@ -126,6 +171,7 @@ async def worker(url: str, session, sem, progress_cb=None):
             "H1": h1,
             "Wörter": wc,
             "CMS": cms,
+            "Broken Links": broken_links,
         }
 
 async def crawl(
