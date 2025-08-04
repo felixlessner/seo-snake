@@ -7,6 +7,19 @@ UNSAFE_SSL = ssl.create_default_context()
 UNSAFE_SSL.check_hostname = False
 UNSAFE_SSL.verify_mode = ssl.CERT_NONE
 
+# Domains, die nicht auf broken geprüft werden sollen (Social / externe große Dienste)
+SKIP_DOMAINS = {
+    "facebook.com",
+    "instagram.com",
+    "whatsapp.com",
+    "twitter.com",
+    "linkedin.com",
+    "youtube.com",
+    "xing.com",
+    "tiktok.com",
+    "wa.me",
+}
+
 def strip_html_for_wc(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     if soup.head:
@@ -108,14 +121,16 @@ async def check_link(session, link):
 
     try:
         async with session.head(link, allow_redirects=True, timeout=10, headers=headers) as resp:
-            if 200 <= resp.status < 400:
+            if 200 <= resp.status < 400 or resp.status == 429:
                 return None
             else:
+                # defekter Status
                 return link
     except Exception:
+        # Fallback auf GET
         try:
             async with session.get(link, allow_redirects=True, timeout=10, headers=headers) as resp:
-                if 200 <= resp.status < 400:
+                if 200 <= resp.status < 400 or resp.status == 429:
                     return None
                 else:
                     return link
@@ -127,21 +142,36 @@ async def find_broken_links(html: str, base_url: str, session) -> str:
     links_with_text = {}
     for tag in soup.find_all("a", href=True):
         href = tag.get("href")
+        if not href:
+            continue
         if href.startswith("mailto:") or href.startswith("tel:"):
             continue
-        link = urllib.parse.urljoin(base_url, href)
-        anchor = tag.get_text(strip=True)
-        links_with_text[link] = anchor
+        full_link = urllib.parse.urljoin(base_url, href)
+        parsed = urllib.parse.urlparse(full_link)
+        domain = parsed.netloc.lower()
 
-    tasks = [(link, check_link(session, link)) for link in links_with_text]
-    results = await asyncio.gather(*(task for _, task in tasks))
+        # Skip social / known external domains that tend to block bots
+        if any(skip in domain for skip in SKIP_DOMAINS):
+            continue
+
+        anchor = tag.get_text(strip=True)
+        links_with_text[full_link] = anchor
+
+    if not links_with_text:
+        return 0
+
+    # parallele Prüfung
+    tasks = [check_link(session, link) for link in links_with_text]
+    results = await asyncio.gather(*tasks)
 
     broken = []
-    for (link, anchor), result in zip(tasks, results):
+    for link, result in zip(links_with_text.keys(), results):
         if result:
-            anchor_display = f'"{links_with_text[link]}"' if links_with_text[link] else '[kein Text]'
-            broken.append(f"{result} (Text: {anchor_display})")
+            anchor_display = f'"{links_with_text[link]}"' if links_with_text[link] else "[kein Text]"
+            broken.append(f"{link} (Text: {anchor_display})")
 
+    if not broken:
+        return 0
     return ", ".join(broken)
 
 async def worker(url: str, session, sem, progress_cb=None):
