@@ -7,18 +7,26 @@ UNSAFE_SSL = ssl.create_default_context()
 UNSAFE_SSL.check_hostname = False
 UNSAFE_SSL.verify_mode = ssl.CERT_NONE
 
-# Domains, die nicht auf broken geprüft werden sollen (Social / externe große Dienste)
-SKIP_DOMAINS = {
-    "facebook.com",
-    "instagram.com",
-    "whatsapp.com",
-    "twitter.com",
-    "linkedin.com",
-    "youtube.com",
-    "xing.com",
-    "tiktok.com",
-    "wa.me",
+# Erlaubte externe Domains zusätzlich zu internen (inkl. Subdomains)
+ALLOWED_EXTERNALS = {
+    "berendsohn-digitalservice.de",
+    "berendsohn-digital.de",
 }
+
+# Helper zum Normieren der Domain (www. ignorieren)
+def normalize_netloc(netloc: str) -> str:
+    netloc = netloc.lower()
+    if netloc.startswith("www."):
+        return netloc[4:]
+    return netloc
+
+def is_allowed_external(link_norm: str, base_norm: str) -> bool:
+    if link_norm == base_norm:
+        return True
+    for allowed in ALLOWED_EXTERNALS:
+        if link_norm == allowed or link_norm.endswith("." + allowed):
+            return True
+    return False
 
 def strip_html_for_wc(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
@@ -98,7 +106,7 @@ async def check_robots(session, page_url):
 
     path = urllib.parse.unquote(p.path or "/")
     best_a = max((x for x in allow if path.startswith(x)), default="", key=len)
-    best_d = max((x for x in dis if path.startswith(x)),   default="", key=len)
+    best_d = max((x for x in dis if path.startswith(x)), default="", key=len)
     return "Allowed" if len(best_a) >= len(best_d) else "Disallowed"
 
 def check_noindex(html: str, headers) -> str:
@@ -124,7 +132,6 @@ async def check_link(session, link):
             if 200 <= resp.status < 400 or resp.status == 429:
                 return None
             else:
-                # defekter Status
                 return link
     except Exception:
         # Fallback auf GET
@@ -140,18 +147,23 @@ async def check_link(session, link):
 async def find_broken_links(html: str, base_url: str, session) -> str:
     soup = BeautifulSoup(html, "lxml")
     links_with_text = {}
+
+    base_parsed = urllib.parse.urlparse(base_url)
+    base_norm = normalize_netloc(base_parsed.netloc)
+
     for tag in soup.find_all("a", href=True):
         href = tag.get("href")
         if not href:
             continue
-        if href.startswith("mailto:") or href.startswith("tel:"):
+        if href.startswith("mailto:") or href.startswith("tel:") or href.startswith("#"):
             continue
+
         full_link = urllib.parse.urljoin(base_url, href)
         parsed = urllib.parse.urlparse(full_link)
-        domain = parsed.netloc.lower()
+        link_norm = normalize_netloc(parsed.netloc)
 
-        # Skip social / known external domains that tend to block bots
-        if any(skip in domain for skip in SKIP_DOMAINS):
+        # Nur interne Links oder erlaubte externe Domains inkl. Subdomains prüfen
+        if not is_allowed_external(link_norm, base_norm):
             continue
 
         anchor = tag.get_text(strip=True)
@@ -193,7 +205,6 @@ async def worker(url: str, session, sem, progress_cb=None):
 
         return {
             "URL": url,
-            # "HTTP Status": status_code,
             "Status": seo_status,
             "Robots Policy": robots,
             "Title": title,
