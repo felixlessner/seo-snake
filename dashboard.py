@@ -209,5 +209,54 @@ Pro Seite sollte es nur eine H1 geben.
 Sie sollte das Haupt-Keyword der Seite enthalten.
 """)
 
+    with st.expander("Broken Link"):
+        st.write("""
+**Was ist ein Broken Link**  
+Ein Broken Link (auch "toter Link" genannt) ist ein Link auf einer Webseite, der nicht mehr funktioniert. Wenn ein Nutzer oder eine Suchmaschine auf diesen Link klickt, landet er auf einer Fehlerseite, meistens einer "404-Seite" (die sogenannte „Fehlerseite“).
+
+**Warum sind Broken Links schlecht?**  
+Broken Links sind aus zwei Hauptgründen problematisch:
+
+1. Schlechte Nutzererfahrung: Wenn Kunden auf der Website auf Links klicken, die ins Leere laufen, sind sie frustriert. Das führt dazu, dass sie Ihre Seite schnell wieder verlassen.
+2. Negatives Signal für Google: Suchmaschinen werten viele Broken Links als Zeichen für eine vernachlässigte oder minderwertige Website. Das kann dazu führen, dass die Seite in den Suchergebnissen schlechter platziert wird.
+
+**Wie lassen sich „Broken Links“ in der Neukunden-Akquise nutzen?**  
+Wenn man bei der Analyse der Website eines potenziellen Kunden (viele) Broken Links findet, kann das als Einstieg in das Gespräch genutzt werden. Es kann aufgezeigt werden, dass die Website des Kunden nicht optimal gepflegt wird, was sich negativ auf das Ranking und die Kundenzufriedenheit auswirkt. Vorschlag: BERENDSOHN wartet / pflegt als Agentur die Website professionell und behebt solche Fehler, um die Online-Präsenz zu stärken.
+""")
+
+    st.subheader("Erklärungen möglicher Fehlermeldungen")
+
+    with st.expander("Fehlercode UTF-8"):
+        st.write("""
+**Was ist UFT-8?**  
+UTF-8 ist wie eine Art „Sprachregelung“ für den Computer. Es ist eine Zeichencodierung, die sicherstellt, dass alle Zeichen – also Buchstaben, Zahlen, Satzzeichen, aber auch Sonderzeichen wie Ä, Ö, Ü und Emojis – auf der Webseite richtig angezeigt werden. Es ist der Standard, den moderne Websites verwenden.
+
+**Was passiert, wenn die Codierung veraltet ist?**  
+Wenn eine Webseite eine alte oder falsche Codierung verwendet, können Suchmaschinen und Browser die Zeichen nicht richtig lesen. Das führt zu mehreren Problemen:
+
+- Falsche Anzeige von Zeichen: Kunden sehen auf der Website seltsame Zeichen statt Umlaute oder Sonderzeichen. Aus „über uns“ wird dann zum Beispiel „Ã¼ber uns“. Das wirkt unprofessionell und stört die Lesbarkeit.
+- Verlust von Daten und Text: Im schlimmsten Fall können Teile des Textes oder ganze Datenblöcke gar nicht erst angezeigt werden, weil die Codierung sie nicht verarbeiten kann.
+- Schlechtere Suchmaschinenoptimierung: Google kann den Inhalt der Seite nicht fehlerfrei erfassen. Das beeinträchtigt das Ranking, da die Suchmaschine nicht genau weiß, worum es auf der Seite geht. Wichtige Keywords, die Umlaute enthalten, werden möglicherweise nicht richtig erkannt.
+
+**Wie kann die veraltete Codierung in der Neukunden-Akquise genutzt werden?**  
+Es sollte erklärt werden, dass eine veraltete Codierung ein technisches Problem ist, das die Nutzererfahrung stört und die Auffindbarkeit bei Google beeinträchtigt. Vorschlag: BERENDSOHN bereinigt als Agentur diese technischen Grundlagen, um die Website professioneller zu gestalten und die SEO-Leistung zu verbessern.
+""")
+
+    with st.expander("Fehlercode SSL"):
+        st.write("""
+**Was ist SSL-Verschlüsselung?**  
+Die SSL-Verschlüsselung ist wie ein digitaler Wachmann für die Webseite. Sie sorgt dafür, dass alle Daten, die zwischen der Website und dem Browser eines Nutzers ausgetauscht werden – also Passwörter, Kreditkarteninformationen oder Anfragen über ein Kontaktformular – absolut sicher sind und nicht von Dritten abgefangen werden können. Eine sichere Verbindung erkennt man am https:// in der Adresszeile und am kleinen Schloss-Symbol davor.
+
+**Was passiert, wenn eine Website nicht verschlüsselt ist?**  
+Wenn eine Website keine SSL-Verschlüsselung hat, passiert Folgendes:
+
+- Google warnt den Kunden: Google zeigt im Browser prominent an, dass die Website "Nicht sicher" ist. Das schreckt Kunden sofort ab und führt dazu, dass sie die Seite aus Angst vor Datenklau wieder verlassen.
+- Schlechteres Google-Ranking: Google stuft unverschlüsselte Websites als weniger vertrauenswürdig ein. Die fehlende SSL-Verschlüsselung ist ein offizieller Ranking-Faktor, der dazu führt, dass die Seite schlechter in den Suchergebnissen platziert wird.
+- Verlorene Kunden und Vertrauen: Kunden sind heute sehr sensibel, was ihre Daten angeht. Eine unsichere Website untergräbt das Vertrauen in das Unternehmen und sorgt dafür, dass Kunden woanders hingehen.
+
+**Wie lässt sich das in der Neukunden-Akquise nutzen?**  
+Überprüfung, ob die Website eines potenziellen Kunden ein Schloss-Symbol in der Adresszeile hat. Wenn nicht, ist das der perfekte Einstieg ins Gespräch: Es sollte erklärt werden, dass die fehlende Verschlüsselung Kunden abschreckt und dem Google-Ranking schadet. Vorschlag, dass BERENDSOHN das SSL-Zertifikat für auf der Website installieren, um die Sicherheit zu gewährleisten und das Vertrauen von Kunden und Suchmaschinen zurückzugewinnen.
+""")
+
 else:
     st.info("Bitte URLs laden und anschließend auf »Analyse starten« klicken.")
