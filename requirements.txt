@@ -5,3 +5,5 @@ pandas
 lxml
 requests
 xlsxwriter
+fastapi
+uvicorn[standard]
