@@ -7,6 +7,17 @@ UNSAFE_SSL = ssl.create_default_context()
 UNSAFE_SSL.check_hostname = False
 UNSAFE_SSL.verify_mode = ssl.CERT_NONE
 
+# Einheitlicher, realistischer Browser-Header für alle Analyse-Requests
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/129.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
 # Erlaubte externe Domains zusätzlich zu internen (inkl. Subdomains)
 ALLOWED_EXTERNALS = {
     "berendsohn-digitalservice.de",
@@ -119,16 +130,9 @@ def check_noindex(html: str, headers) -> str:
     return "Indexable"
 
 async def check_link(session, link):
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/114.0.0.0 Safari/537.36"
-        )
-    }
-
+    # nutzt dieselbe Session mit Browser-Headern
     try:
-        async with session.head(link, allow_redirects=True, timeout=10, headers=headers) as resp:
+        async with session.head(link, allow_redirects=True, timeout=10) as resp:
             if 200 <= resp.status < 400 or resp.status == 429:
                 return None
             else:
@@ -136,7 +140,7 @@ async def check_link(session, link):
     except Exception:
         # Fallback auf GET
         try:
-            async with session.get(link, allow_redirects=True, timeout=10, headers=headers) as resp:
+            async with session.get(link, allow_redirects=True, timeout=10) as resp:
                 if 200 <= resp.status < 400 or resp.status == 429:
                     return None
                 else:
@@ -222,7 +226,8 @@ async def crawl(
 ) -> pd.DataFrame:
     connector = aiohttp.TCPConnector(limit=concurrency, ssl=UNSAFE_SSL)
     sem = asyncio.Semaphore(concurrency)
-    async with aiohttp.ClientSession(timeout=TIMEOUT, connector=connector) as sess:
+    # >>> Session jetzt mit realistischem Browser-Header <<<
+    async with aiohttp.ClientSession(timeout=TIMEOUT, connector=connector, headers=BROWSER_HEADERS) as sess:
         tasks = [worker(u, sess, sem, progress_cb) for u in urls]
         results = await asyncio.gather(*tasks)
     return pd.DataFrame(results)

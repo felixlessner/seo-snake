@@ -1,11 +1,17 @@
-
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urldefrag, urlparse
 
+# Realistischer Browser-Header statt Bot-String
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; SEOChecker/1.0; +https://example.com/bot)"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/129.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
 def normalize_domain(domain: str) -> str:
