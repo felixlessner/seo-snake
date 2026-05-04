@@ -1,4 +1,10 @@
-import asyncio, aiohttp, pandas as pd, ssl, urllib.parse, re, time, argparse
+import asyncio
+import aiohttp
+import pandas as pd
+import ssl
+import urllib.parse
+import re
+import argparse
 from bs4 import BeautifulSoup
 from typing import List, Callable, Awaitable
 
@@ -7,7 +13,7 @@ UNSAFE_SSL = ssl.create_default_context()
 UNSAFE_SSL.check_hostname = False
 UNSAFE_SSL.verify_mode = ssl.CERT_NONE
 
-# Einheitlicher, realistischer Browser-Header für alle Analyse-Requests
+# Einheitlicher, realistischer Browser-Header fuer alle Analyse-Requests
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -18,11 +24,12 @@ BROWSER_HEADERS = {
     "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
-# Erlaubte externe Domains zusätzlich zu internen (inkl. Subdomains)
+# Erlaubte externe Domains zusaetzlich zu internen (inkl. Subdomains)
 ALLOWED_EXTERNALS = {
     "berendsohn-digitalservice.de",
     "berendsohn-digital.de",
 }
+
 
 # Helper zum Normieren der Domain (www. ignorieren)
 def normalize_netloc(netloc: str) -> str:
@@ -30,6 +37,7 @@ def normalize_netloc(netloc: str) -> str:
     if netloc.startswith("www."):
         return netloc[4:]
     return netloc
+
 
 def is_allowed_external(link_norm: str, base_norm: str) -> bool:
     if link_norm == base_norm:
@@ -39,6 +47,7 @@ def is_allowed_external(link_norm: str, base_norm: str) -> bool:
             return True
     return False
 
+
 def strip_html_for_wc(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     if soup.head:
@@ -47,8 +56,10 @@ def strip_html_for_wc(html: str) -> str:
         t.decompose()
     return re.sub(r"\s+", " ", soup.get_text(" ")).strip()
 
+
 def word_count(html: str) -> int:
     return len(strip_html_for_wc(html).split())
+
 
 def detect_cms(html: str, headers, url: str) -> str:
     soup = BeautifulSoup(html, "lxml")
@@ -66,17 +77,35 @@ def detect_cms(html: str, headers, url: str) -> str:
             return name
     return "Unbekannt"
 
+
+# NEU/ANGEPASST: H1-Pruefung (bei mehreren: alle im Feld "H1" listen)
+def get_h1_info(soup: BeautifulSoup) -> tuple[str, int]:
+    """Gibt (h1_text_aggregiert, h1_anzahl) zurueck.
+
+    - Wenn mehrere H1 vorhanden sind, werden alle Texte in der Reihenfolge ihres Auftretens
+      mit ' | ' getrennt in einem String zurueckgegeben.
+    """
+    h1s = soup.find_all("h1")
+    h1_texts = [h.get_text(separator=" ", strip=True) for h in h1s]
+    h1_texts = [t for t in h1_texts if t]  # leere Texte rausfiltern
+    return " | ".join(h1_texts), len(h1s)
+
+
 def parse_page(html: str):
     soup = BeautifulSoup(html, "lxml")
+
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
+
     meta = soup.find("meta", attrs={"name": "description"})
     meta_desc = meta.get("content", "").strip() if meta else ""
-    h1 = soup.find("h1")
-    h1_txt = h1.get_text(separator=" ", strip=True) if h1 else ""
-    wc = word_count(html)
-    return title, meta_desc, h1_txt, wc
 
-async def fetch(session: aiohttp.ClientSession, url: str, retries=3):
+    h1_txt, h1_count = get_h1_info(soup)
+    wc = word_count(html)
+
+    return title, meta_desc, h1_txt, h1_count, wc
+
+
+async def fetch(session: aiohttp.ClientSession, url: str, retries: int = 3):
     last_exc = None
     for attempt in range(retries):
         try:
@@ -88,13 +117,15 @@ async def fetch(session: aiohttp.ClientSession, url: str, retries=3):
             await asyncio.sleep(1.5 * (attempt + 1))
     raise last_exc
 
-async def check_robots(session, page_url):
+
+async def check_robots(session: aiohttp.ClientSession, page_url: str) -> str:
     p = urllib.parse.urlparse(page_url)
     robots_url = f"{p.scheme}://{p.netloc}/robots.txt"
     try:
         _, txt, _ = await fetch(session, robots_url, retries=2)
     except Exception:
         return "robots.txt error"
+
     if txt.lower().startswith("404"):
         return "robots.txt not found"
 
@@ -120,6 +151,7 @@ async def check_robots(session, page_url):
     best_d = max((x for x in dis if path.startswith(x)), default="", key=len)
     return "Allowed" if len(best_a) >= len(best_d) else "Disallowed"
 
+
 def check_noindex(html: str, headers) -> str:
     if "X-Robots-Tag" in headers and "noindex" in headers["X-Robots-Tag"].lower():
         return "NOINDEX via Header"
@@ -129,28 +161,28 @@ def check_noindex(html: str, headers) -> str:
         return "NOINDEX via Meta"
     return "Indexable"
 
-async def check_link(session, link):
+
+async def check_link(session: aiohttp.ClientSession, link: str):
     # nutzt dieselbe Session mit Browser-Headern
     try:
         async with session.head(link, allow_redirects=True, timeout=10) as resp:
             if 200 <= resp.status < 400 or resp.status == 429:
                 return None
-            else:
-                return link
+            return link
     except Exception:
         # Fallback auf GET
         try:
             async with session.get(link, allow_redirects=True, timeout=10) as resp:
                 if 200 <= resp.status < 400 or resp.status == 429:
                     return None
-                else:
-                    return link
+                return link
         except Exception:
             return link
 
-async def find_broken_links(html: str, base_url: str, session) -> str:
+
+async def find_broken_links(html: str, base_url: str, session: aiohttp.ClientSession) -> str | int:
     soup = BeautifulSoup(html, "lxml")
-    links_with_text = {}
+    links_with_text: dict[str, str] = {}
 
     base_parsed = urllib.parse.urlparse(base_url)
     base_norm = normalize_netloc(base_parsed.netloc)
@@ -166,7 +198,7 @@ async def find_broken_links(html: str, base_url: str, session) -> str:
         parsed = urllib.parse.urlparse(full_link)
         link_norm = normalize_netloc(parsed.netloc)
 
-        # Nur interne Links oder erlaubte externe Domains inkl. Subdomains prüfen
+        # Nur interne Links oder erlaubte externe Domains inkl. Subdomains pruefen
         if not is_allowed_external(link_norm, base_norm):
             continue
 
@@ -176,7 +208,7 @@ async def find_broken_links(html: str, base_url: str, session) -> str:
     if not links_with_text:
         return 0
 
-    # parallele Prüfung
+    # parallele Pruefung
     tasks = [check_link(session, link) for link in links_with_text]
     results = await asyncio.gather(*tasks)
 
@@ -190,34 +222,40 @@ async def find_broken_links(html: str, base_url: str, session) -> str:
         return 0
     return ", ".join(broken)
 
-async def worker(url: str, session, sem, progress_cb=None):
+
+async def worker(url: str, session: aiohttp.ClientSession, sem: asyncio.Semaphore, progress_cb=None):
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
+
     async with sem:
         if progress_cb:
             progress_cb("fetch", url)
+
         try:
             status_code, html, headers = await fetch(session, url)
         except Exception as e:
             return {"URL": url, "Status": f"Error: {e}"}
 
         seo_status = check_noindex(html, headers)
-        title, meta_desc, h1, wc = parse_page(html)
+        title, meta_desc, h1_txt, h1_count, wc = parse_page(html)
         robots = await check_robots(session, url)
         cms = detect_cms(html, headers, url)
         broken_links = await find_broken_links(html, url, session)
 
         return {
             "URL": url,
+            "HTTP Status": status_code,
             "Status": seo_status,
             "Robots Policy": robots,
             "Title": title,
             "Meta Description": meta_desc,
-            "H1": h1,
+            "H1": h1_txt,
+            "H1 Anzahl": h1_count,
             "Wörter": wc,
             "CMS": cms,
             "Broken Links": broken_links,
         }
+
 
 async def crawl(
     urls: List[str],
@@ -226,11 +264,14 @@ async def crawl(
 ) -> pd.DataFrame:
     connector = aiohttp.TCPConnector(limit=concurrency, ssl=UNSAFE_SSL)
     sem = asyncio.Semaphore(concurrency)
-    # >>> Session jetzt mit realistischem Browser-Header <<<
+
+    # Session mit realistischem Browser-Header
     async with aiohttp.ClientSession(timeout=TIMEOUT, connector=connector, headers=BROWSER_HEADERS) as sess:
         tasks = [worker(u, sess, sem, progress_cb) for u in urls]
         results = await asyncio.gather(*tasks)
+
     return pd.DataFrame(results)
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser("Asynchroner SEO-Crawler")

@@ -69,20 +69,47 @@ if st.session_state["url_list"]:
         st.session_state["result_df"] = asyncio.run(run_crawl(st.session_state["url_list"]))
         progress.empty()
 
-def row_style(row):
-    if str(row.get("HTTP Status", "")).startswith(("4", "5")):
-        return ["background-color: #f8d7da"] * len(row)
-    if "noindex" in str(row.get("Status", "")).lower() or row.get("Robots Policy") == "Disallowed":
-        return ["background-color: #fff4cd"] * len(row)
-    return [""] * len(row)
+def style_cells(row):
+    """Zellenbasiertes Styling: markiert nur die relevanten Felder hellrot (#f8d7da)."""
+    styles = [""] * len(row)
+
+    # HTTP Status: nur die Status-Zelle markieren
+    http_status = str(row.get("HTTP Status", ""))
+    if http_status.startswith(("4", "5")) and "HTTP Status" in row.index:
+        styles[row.index.get_loc("HTTP Status")] = "background-color: #f8d7da"
+
+    # Noindex: nur die Status-Zelle markieren
+    status_val = str(row.get("Status", ""))
+    if "noindex" in status_val.lower() and "Status" in row.index:
+        styles[row.index.get_loc("Status")] = "background-color: #f8d7da"
+
+    # Robots Policy: nur die Robots-Policy-Zelle markieren
+    if str(row.get("Robots Policy", "")) == "Disallowed" and "Robots Policy" in row.index:
+        styles[row.index.get_loc("Robots Policy")] = "background-color: #f8d7da"
+
+    # Mehrere H1: nur die H1-Zelle markieren
+    try:
+        h1_count = int(row.get("H1 Anzahl", 0) or 0)
+    except Exception:
+        h1_count = 0
+    if h1_count > 1 and "H1" in row.index:
+        styles[row.index.get_loc("H1")] = "background-color: #f8d7da"
+    # Broken Links: nur die Broken-Links-Zelle markieren (wenn nicht 0/leer)
+    broken_val = row.get("Broken Links", "")
+    broken_str = str(broken_val).strip()
+    if broken_str not in ("", "0", "0.0") and "Broken Links" in row.index:
+        styles[row.index.get_loc("Broken Links")] = "background-color: #f8d7da"
+
+    return styles
 
 if st.session_state["result_df"] is not None:
+
     df = st.session_state["result_df"].drop(
         columns=[c for c in ("Hinweis",) if c in st.session_state["result_df"].columns]
     )
 
     try:
-        styled = df.style.apply(row_style, axis=1)
+        styled = df.style.apply(style_cells, axis=1)
         st.dataframe(styled, use_container_width=True)
     except AttributeError:
         st.dataframe(df, use_container_width=True)
